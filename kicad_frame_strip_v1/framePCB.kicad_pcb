@@ -1,9 +1,9 @@
-(kicad_pcb (version 4) (host pcbnew "(2015-03-13 BZR 5510)-product")
+(kicad_pcb (version 20160815) (host pcbnew 4.1.0-alpha+201608211231+7083~46~ubuntu16.04.1-product)
 
   (general
     (links 124)
     (no_connects 35)
-    (area 107.720001 71.359999 157.925715 130.460001)
+    (area 117.849999 85.479999 148.870001 121.560001)
     (thickness 1.6)
     (drawings 106)
     (tracks 581)
@@ -89,7 +89,6 @@
       (hpglpennumber 1)
       (hpglpenspeed 20)
       (hpglpendiameter 15)
-      (hpglpenoverlay 2)
       (psnegative false)
       (psa4output false)
       (plotreference true)
@@ -159,6 +158,8 @@
     (via_drill 0.4)
     (uvia_dia 0.3)
     (uvia_drill 0.1)
+    (diff_pair_gap 0.25)
+    (diff_pair_width 0.2)
     (add_net /12V)
     (add_net /B1)
     (add_net /B2)

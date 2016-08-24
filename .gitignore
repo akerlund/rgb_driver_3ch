@@ -1,4 +1,7 @@
 .gitignore~
 kicad_frame_strip_v1/framePCB.kicad_pcb-bak
 kicad_frame_strip_v2/frame_strip.kicad_pcb-bak
-
+template-stm32f100-ledstuff1/lib/libopencm3/lib/
+kicad_frame_strip_v1/framePCB-rescue.lib
+kicad_frame_strip_v2/frame_strip-rescue.lib
+kicad_frame_strip_v1/_saved_framePCB.pro

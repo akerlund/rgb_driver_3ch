@@ -1,4 +1,5 @@
 EESchema Schematic File Version 2
+LIBS:frame_strip-rescue
 LIBS:power
 LIBS:w_analog
 LIBS:w_connectors
@@ -636,7 +637,7 @@ F 3 "" H 1650 3700 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	1650 3800 1300 3800
+	1300 3800 2250 3800
 Text Label 1650 3250 0    60   ~ 0
 3.3V
 Text Label 1550 3800 2    60   ~ 0
@@ -667,17 +668,13 @@ Text Label 3750 1600 2    60   ~ 0
 ADC1_4
 Text Label 3750 1700 2    60   ~ 0
 ADC1_5
-NoConn ~ 3750 2600
-NoConn ~ 3750 2700
-NoConn ~ 3750 2800
-NoConn ~ 3750 3300
 NoConn ~ 3750 3400
 $Comp
 L SW_SPDT SW3
 U 1 1 57A03707
 P 2000 8000
 F 0 "SW3" H 2000 7900 50  0000 C CNN
-F 1 "SW_SPDT" H 2000 8150 50  0000 C CNN
+F 1 "ON/OFF" H 2000 8150 50  0000 C CNN
 F 2 "w_switch:switch_mmp122-r" H 2000 8000 60  0001 C CNN
 F 3 "" H 2000 8000 60  0000 C CNN
 	1    2000 8000
@@ -711,12 +708,12 @@ U 1 1 57A04670
 P 2450 8000
 F 0 "C6" H 2500 8010 50  0000 L CNN
 F 1 "C" H 2500 7940 50  0000 L CNN
-F 2 "w_smd_cap:c_0603" H 2450 8000 60  0001 C CNN
+F 2 "w_smd_cap:c_elec_5x5.3" H 2450 8000 60  0001 C CNN
 F 3 "" H 2450 8000 60  0000 C CNN
 	1    2450 8000
 	1    0    0    -1  
 $EndComp
-Text Label 2450 7950 0    60   ~ 0
+Text Label 1800 7750 2    60   ~ 0
 12V
 Text Label 2450 8300 0    60   ~ 0
 GND
@@ -752,8 +749,6 @@ Connection ~ 2450 8150
 Wire Wire Line
 	2150 7950 2650 7950
 Connection ~ 2450 7950
-Wire Wire Line
-	2250 7750 2250 7950
 Connection ~ 2250 7950
 Wire Wire Line
 	2350 7750 2350 8150
@@ -835,7 +830,7 @@ L LED LD1
 U 1 1 57A086DD
 P 1550 4550
 F 0 "LD1" H 1550 4650 40  0000 C CNN
-F 1 "LED" H 1600 4450 40  0000 C CNN
+F 1 "LED1" H 1600 4450 40  0000 C CNN
 F 2 "w_smd_leds:Led_0805" H 1550 4550 60  0001 C CNN
 F 3 "" H 1550 4550 60  0000 C CNN
 	1    1550 4550
@@ -846,7 +841,7 @@ L LED LD2
 U 1 1 57A087C3
 P 1800 4550
 F 0 "LD2" H 1800 4650 40  0000 C CNN
-F 1 "LED" H 1850 4450 40  0000 C CNN
+F 1 "LED2" H 1850 4450 40  0000 C CNN
 F 2 "w_smd_leds:Led_0805" H 1800 4550 60  0001 C CNN
 F 3 "" H 1800 4550 60  0000 C CNN
 	1    1800 4550
@@ -857,7 +852,7 @@ L LED LD3
 U 1 1 57A0887B
 P 2050 4550
 F 0 "LD3" H 2050 4650 40  0000 C CNN
-F 1 "LED" H 2100 4450 40  0000 C CNN
+F 1 "LED3" H 2100 4450 40  0000 C CNN
 F 2 "w_smd_leds:Led_0805" H 2050 4550 60  0001 C CNN
 F 3 "" H 2050 4550 60  0000 C CNN
 	1    2050 4550
@@ -868,7 +863,7 @@ L LED LD4
 U 1 1 57A0893A
 P 2300 4550
 F 0 "LD4" H 2300 4650 40  0000 C CNN
-F 1 "LED" H 2350 4450 40  0000 C CNN
+F 1 "LED4" H 2350 4450 40  0000 C CNN
 F 2 "w_smd_leds:Led_0805" H 2300 4550 60  0001 C CNN
 F 3 "" H 2300 4550 60  0000 C CNN
 	1    2300 4550
@@ -896,13 +891,13 @@ Text Label 2050 4250 0    60   ~ 0
 LED3
 Text Label 2300 4250 0    60   ~ 0
 LED4
-Text Label 3750 3500 2    60   ~ 0
+Text Label 3750 2600 2    60   ~ 0
 LED1
-Text Label 3750 4100 2    60   ~ 0
+Text Label 3750 2700 2    60   ~ 0
 LED2
-Text Label 3750 4200 2    60   ~ 0
+Text Label 3750 2800 2    60   ~ 0
 LED3
-Text Label 3750 4300 2    60   ~ 0
+Text Label 3750 3300 2    60   ~ 0
 LED4
 Text Label 3750 4400 2    60   ~ 0
 SPI1_SCK
@@ -921,11 +916,11 @@ F 3 "" H 2600 1900 60  0000 C CNN
 	1    2600 1900
 	1    0    0    -1  
 $EndComp
-Text Label 2500 1700 2    60   ~ 0
+Text Label 2500 1900 2    60   ~ 0
 SPI1_SCK
 Text Label 2500 1800 2    60   ~ 0
 SPI1_MISO
-Text Label 2500 1900 2    60   ~ 0
+Text Label 2500 1700 2    60   ~ 0
 SPI1_MOSI
 Text Label 2500 2000 2    60   ~ 0
 GND
@@ -947,7 +942,6 @@ NoConn ~ 7050 2250
 NoConn ~ 7050 2350
 NoConn ~ 7050 2450
 NoConn ~ 7050 2650
-NoConn ~ 1850 3750
 $Comp
 L R R19
 U 1 1 57A0CF6B
@@ -960,10 +954,10 @@ F 3 "" H 2200 5350 60  0000 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L POT R22
+L POT ADC4
 U 1 1 57A0D08D
 P 2400 5350
-F 0 "R22" V 2450 5250 50  0000 C CNN
+F 0 "ADC4" V 2450 5250 50  0000 C CNN
 F 1 "POT" H 2400 5250 50  0001 C CNN
 F 2 "w_pin_strip:pin_socket_3" H 2400 5350 60  0001 C CNN
 F 3 "" H 2400 5350 60  0000 C CNN
@@ -972,7 +966,7 @@ F 3 "" H 2400 5350 60  0000 C CNN
 $EndComp
 Text Label 2400 5500 0    60   ~ 0
 GND
-Text Label 2400 5250 0    60   ~ 0
+Text Label 2450 5250 0    60   ~ 0
 3.3V
 Wire Wire Line
 	2400 5500 2400 5450
@@ -988,10 +982,10 @@ F 3 "" H 2200 5800 60  0000 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L POT R23
+L POT ADC5
 U 1 1 57A0DD3F
 P 2400 5800
-F 0 "R23" V 2450 5700 50  0000 C CNN
+F 0 "ADC5" V 2450 5700 50  0000 C CNN
 F 1 "POT" H 2400 5700 50  0001 C CNN
 F 2 "w_pin_strip:pin_socket_3" H 2400 5800 60  0001 C CNN
 F 3 "" H 2400 5800 60  0000 C CNN
@@ -1000,7 +994,7 @@ F 3 "" H 2400 5800 60  0000 C CNN
 $EndComp
 Text Label 2400 5950 0    60   ~ 0
 GND
-Text Label 2400 5700 0    60   ~ 0
+Text Label 2450 5700 0    60   ~ 0
 3.3V
 Wire Wire Line
 	2400 5950 2400 5900
@@ -1016,10 +1010,10 @@ F 3 "" H 2200 6250 60  0000 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L POT R24
+L POT ADC6
 U 1 1 57A0DF25
 P 2400 6250
-F 0 "R24" V 2450 6150 50  0000 C CNN
+F 0 "ADC6" V 2450 6150 50  0000 C CNN
 F 1 "POT" H 2400 6150 50  0001 C CNN
 F 2 "w_pin_strip:pin_socket_3" H 2400 6250 60  0001 C CNN
 F 3 "" H 2400 6250 60  0000 C CNN
@@ -1028,7 +1022,7 @@ F 3 "" H 2400 6250 60  0000 C CNN
 $EndComp
 Text Label 2400 6400 0    60   ~ 0
 GND
-Text Label 2400 6150 0    60   ~ 0
+Text Label 2450 6150 0    60   ~ 0
 3.3V
 Wire Wire Line
 	2400 6400 2400 6350
@@ -1086,4 +1080,110 @@ Text Label 1300 10350 3    60   ~ 0
 GND
 Text Label 900  10350 3    60   ~ 0
 GND
+Wire Wire Line
+	2250 7750 1800 7750
+Wire Wire Line
+	1800 7750 1800 8000
+Connection ~ 1800 8000
+Wire Wire Line
+	2400 5250 2450 5250
+Wire Wire Line
+	2400 5700 2450 5700
+Wire Wire Line
+	2400 6150 2450 6150
+$Comp
+L SW_PUSH SW4
+U 1 1 57BD9842
+P 2250 3650
+F 0 "SW4" H 2260 3770 50  0000 C CNN
+F 1 "RESET" H 2250 3570 50  0000 C CNN
+F 2 "w_switch:smd_push" H 2250 3650 60  0001 C CNN
+F 3 "" H 2250 3650 60  0000 C CNN
+	1    2250 3650
+	0    -1   -1   0   
+$EndComp
+Text Label 950  4450 0    60   ~ 0
+GND
+Text Label 2200 3500 2    60   ~ 0
+RESET
+Wire Wire Line
+	2200 3500 2250 3500
+Connection ~ 1650 3800
+$Comp
+L HEADER_3 J13
+U 1 1 57BDC9EB
+P 6200 7950
+F 0 "J13" H 6327 8003 60  0000 L CNN
+F 1 "HEADER_3" H 6327 7897 60  0000 L CNN
+F 2 "w_pin_strip:pin_socket_3" H 6200 7950 60  0001 C CNN
+F 3 "" H 6200 7950 60  0000 C CNN
+	1    6200 7950
+	1    0    0    -1  
+$EndComp
+$Comp
+L HEADER_3 J14
+U 1 1 57BDCB62
+P 6200 8350
+F 0 "J14" H 6327 8403 60  0000 L CNN
+F 1 "HEADER_3" H 6327 8297 60  0000 L CNN
+F 2 "w_pin_strip:pin_socket_3" H 6200 8350 60  0001 C CNN
+F 3 "" H 6200 8350 60  0000 C CNN
+	1    6200 8350
+	1    0    0    -1  
+$EndComp
+$Comp
+L HEADER_3 J15
+U 1 1 57BDCC52
+P 6200 8750
+F 0 "J15" H 6327 8803 60  0000 L CNN
+F 1 "HEADER_3" H 6327 8697 60  0000 L CNN
+F 2 "w_pin_strip:pin_socket_3" H 6200 8750 60  0001 C CNN
+F 3 "" H 6200 8750 60  0000 C CNN
+	1    6200 8750
+	1    0    0    -1  
+$EndComp
+Text Label 6100 7850 2    60   ~ 0
+TIM4_CH1
+Text Label 6100 7950 2    60   ~ 0
+TIM4_CH2
+Text Label 6100 8050 2    60   ~ 0
+TIM4_CH3
+Text Label 6100 8250 2    60   ~ 0
+TIM4_CH4
+Text Label 6100 8350 2    60   ~ 0
+TIM2_CH2
+Text Label 6100 8450 2    60   ~ 0
+TIM3_CH2
+Text Label 6100 8650 2    60   ~ 0
+TIM3_CH3
+Text Label 6100 8750 2    60   ~ 0
+TIM3_CH4
+Text Label 6100 8850 2    60   ~ 0
+TIM1_CH1
+NoConn ~ 7050 2550
+$Comp
+L HEADER_3 J16
+U 1 1 57BE2968
+P 6200 9150
+F 0 "J16" H 6327 9203 60  0000 L CNN
+F 1 "I2C2" H 6327 9097 60  0000 L CNN
+F 2 "w_pin_strip:pin_socket_3" H 6200 9150 60  0001 C CNN
+F 3 "" H 6200 9150 60  0000 C CNN
+	1    6200 9150
+	1    0    0    -1  
+$EndComp
+Text Label 6100 9050 2    60   ~ 0
+SCL
+Text Label 6100 9150 2    60   ~ 0
+SDA
+Text Label 6100 9250 2    60   ~ 0
+PB12
+Text Label 3750 4100 2    60   ~ 0
+SCL
+Text Label 3750 4200 2    60   ~ 0
+SDA
+Text Label 3750 4300 2    60   ~ 0
+PB12
+NoConn ~ 3750 1200
+NoConn ~ 3750 3500
 $EndSCHEMATC
