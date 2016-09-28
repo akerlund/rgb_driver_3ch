@@ -1,4 +1,5 @@
 EESchema Schematic File Version 2
+LIBS:framePCB-rescue
 LIBS:power
 LIBS:device
 LIBS:transistors
@@ -10,7 +11,6 @@ LIBS:cmos4000
 LIBS:adc-dac
 LIBS:memory
 LIBS:xilinx
-LIBS:special
 LIBS:microcontrollers
 LIBS:dsp
 LIBS:microchip
@@ -30,10 +30,19 @@ LIBS:atmel
 LIBS:contrib
 LIBS:valves
 LIBS:crf_1
-LIBS:w_freaquency
+LIBS:freakuency
+LIBS:w_analog
 LIBS:w_connectors
 LIBS:w_device
+LIBS:w_logic
+LIBS:w_memory
+LIBS:w_microcontrollers
+LIBS:w_opto
+LIBS:Worldsemi
+LIBS:w_relay
+LIBS:w_rtx
 LIBS:w_transistor
+LIBS:w_vacuum
 LIBS:framePCB-cache
 EELAYER 25 0
 EELAYER END
@@ -116,7 +125,7 @@ F 3 "" H 4600 1850 30  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L POT RV1
+L POT-RESCUE-framePCB RV1
 U 1 1 56327631
 P 5400 7900
 F 0 "RV1" H 5400 7800 50  0000 C CNN
@@ -248,7 +257,7 @@ F 3 "" H 4600 1050 30  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L POT RV2
+L POT-RESCUE-framePCB RV2
 U 1 1 563299A7
 P 5700 7900
 F 0 "RV2" H 5700 7800 50  0000 C CNN
@@ -462,7 +471,7 @@ VDD
 Text Label 4650 8400 0    60   ~ 0
 GND
 $Comp
-L LED D1
+L LED-RESCUE-framePCB D1
 U 1 1 5632FEA2
 P 1150 7750
 F 0 "D1" H 1150 7850 50  0000 C CNN
@@ -508,7 +517,7 @@ F 3 "" H 1750 7300 30  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L LED D2
+L LED-RESCUE-framePCB D2
 U 1 1 563308D1
 P 1450 7750
 F 0 "D2" H 1450 7850 50  0000 C CNN
@@ -519,7 +528,7 @@ F 3 "" H 1450 7750 60  0000 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L LED D3
+L LED-RESCUE-framePCB D3
 U 1 1 5633093F
 P 1750 7750
 F 0 "D3" H 1750 7850 50  0000 C CNN
@@ -545,7 +554,7 @@ POT1
 Text Label 1200 1600 2    60   ~ 0
 POT2
 $Comp
-L LED D4
+L LED-RESCUE-framePCB D4
 U 1 1 563324AB
 P 2550 7750
 F 0 "D4" H 2550 7850 50  0000 C CNN
@@ -591,7 +600,7 @@ F 3 "" H 3150 7300 30  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L LED D5
+L LED-RESCUE-framePCB D5
 U 1 1 563324C4
 P 2850 7750
 F 0 "D5" H 2850 7850 50  0000 C CNN
@@ -602,7 +611,7 @@ F 3 "" H 2850 7750 60  0000 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L LED D6
+L LED-RESCUE-framePCB D6
 U 1 1 563324CA
 P 3150 7750
 F 0 "D6" H 3150 7850 50  0000 C CNN
@@ -970,7 +979,7 @@ Text Label 1200 4000 2    60   ~ 0
 TIM4_CH4
 Connection ~ 1600 9250
 $Comp
-L GND #PWR03
+L GND-RESCUE-framePCB #PWR03
 U 1 1 5633A332
 P 2350 9250
 F 0 "#PWR03" H 2350 9000 60  0001 C CNN
@@ -1034,7 +1043,7 @@ GND
 Text Notes 3750 10300 0    60   ~ 0
 En lampa med alla lampor i den
 $Comp
-L POT RV3
+L POT-RESCUE-framePCB RV3
 U 1 1 563689A7
 P 6250 7900
 F 0 "RV3" H 6250 7800 50  0000 C CNN

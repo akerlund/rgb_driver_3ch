@@ -1097,7 +1097,7 @@ U 1 1 56389C24
 P 1200 8650
 F 0 "J7" H 1200 8800 60  0000 C CNN
 F 1 "JST" V 1350 8650 60  0000 C CNN
-F 2 "w_pin_strip:pin_strip_1" H 1200 8650 60  0001 C CNN
+F 2 "w_pin_strip:pin_strip_2" H 1200 8650 60  0001 C CNN
 F 3 "" H 1200 8650 60  0000 C CNN
 	1    1200 8650
 	0    -1   -1   0   
@@ -1114,7 +1114,7 @@ U 1 1 5638A27C
 P 3200 8650
 F 0 "J8" H 3200 8800 60  0000 C CNN
 F 1 "VDD" V 3350 8650 60  0000 C CNN
-F 2 "w_pin_strip:pin_strip_2" H 3200 8650 60  0001 C CNN
+F 2 "w_pin_strip:pin_strip_1" H 3200 8650 60  0001 C CNN
 F 3 "" H 3200 8650 60  0000 C CNN
 	1    3200 8650
 	0    -1   -1   0   

@@ -19,7 +19,7 @@ SIZE = $(TOOLCHAIN)-size
 CPU_DEFINES = -mthumb -mcpu=cortex-m3 -msoft-float -DSTM32F1
 
 #Compiler options
-CFLAGS += -g -c -std=gnu99 -Os -Wall -fno-common -ffunction-sections
+CFLAGS += -g -c -std=gnu99 -Os -Wall -fno-common -ffunction-sections -w
 CFLAGS += -fdata-sections 
 CFLAGS += $(CPU_DEFINES)
 

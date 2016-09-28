@@ -8,11 +8,16 @@
 #include <libopencm3/cm3/nvic.h>
 
 #include "gamma.h"
+#include <stdio.h>
 
+#define RMAX 4096
+#define GMAX 4096
+#define BMAX 4096
+/*
 #define RMAX 4096
 #define GMAX 3500
 #define BMAX 2500
-
+*/
 #define led_2 GPIO12	//
 #define led_5 GPIO15
 #define led_6 GPIO3
@@ -35,7 +40,6 @@ static volatile int ms_time_delay;	//WTF!? Why do I have to use static!???
 volatile uint8_t usart_rx_buffer[64];
 volatile bool usart_recieved = false;
 
-
 void sys_tick_handler(void){
 	if (ms_time_delay) {
 		ms_time_delay--;
@@ -47,7 +51,6 @@ void sleep_ms(int t){
 	ms_time_delay = t;
 	while (ms_time_delay);
 }
-
 
 void setup_clock( ){
 
@@ -209,14 +212,6 @@ void usart3_isr(void){
 }
 
 
-void dma1_channel1_isr(void) {
-
-	DMA1_IFCR |= DMA_IFCR_CTCIF1;
-
-	adc_start_conversion_regular(ADC1);
-} 
-
-
 void setup_LEDs( ){
 
 	// For using PA13-15 and PB3.
@@ -248,6 +243,84 @@ inline void colorHexagon(int hue, int *R, int *G, int *B){
 	int ci = hue & 0xFFF;
 	int cd = 4095 - ci;
 	int cs = 4095;
+	switch (frac) {
+		case 0:	*R = cs;	*G = ci;	*B = 0; break;	//R1	G+	B0
+		case 1:	*R = cd;	*G = cs;	*B = 0; break;	//R-	G1	B0
+		case 2:	*R = 0;		*G = cs;	*B = ci; break;	//R0	G1	B+
+		case 3:	*R = 0;		*G = cd;	*B = cs; break;	//R0	G-	B1
+		case 4:	*R = ci;	*G = 0;		*B = cs; break;	//R+	G0	B1
+		case 5:	*R = cs;	*G = 0;		*B = cd; break;	//R1	G0	B-
+	}
+}
+inline void colorHSL(int hue, int sat, int light,int *R, int *G, int *B) {
+
+	int tR,tG,tB;
+	int frac = hue >> 12;
+
+	//Chroma
+	int C = ((4095-abs((light<<1)-4095))*sat)>>12;
+	int X= (C*(4095-abs((hue % 8192) - 4095)))>>12;
+
+	//Hue
+	switch (frac) {
+		case 0:	tR = C;	tG = X;	tB = 0; break;	//R1	G+	B0
+		case 1:	tR = X;	tG = C;	tB = 0; break;	//R-	G1	B0
+		case 2:	tR = 0;	tG = C;	tB = X; break;	//R0	G1	B+
+		case 3:	tR = 0;	tG = X;	tB = C; break;	//R0	G-	B1
+		case 4:	tR = X;	tG = 0;	tB = C; break;	//R+	G0	B1
+		case 5:	tR = C;	tG = 0;	tB = X; break;	//R1	G0	B-
+	}
+
+	//Lightness	
+	int m = light - (C>>1);
+	tR+=m; tG+=m; tB+=m;
+	*R = tR; *G = tG; *B = tB;
+}
+
+inline void colorHCY(int hue, int chroma, int luma,int *R, int *G, int *B) {
+
+	int tR,tG,tB;
+	int frac = hue >> 12;
+
+	//Chroma
+	int C = chroma;
+	int X= (C*(4095-abs((hue % 8192) - 4095)))>>12;
+
+	//Hue
+	switch (frac) {
+		case 0:	tR = C;	tG = X;	tB = 0; break;	//R1	G+	B0
+		case 1:	tR = X;	tG = C;	tB = 0; break;	//R-	G1	B0
+		case 2:	tR = 0;	tG = C;	tB = X; break;	//R0	G1	B+
+		case 3:	tR = 0;	tG = X;	tB = C; break;	//R0	G-	B1
+		case 4:	tR = X;	tG = 0;	tB = C; break;	//R+	G0	B1
+		case 5:	tR = C;	tG = 0;	tB = X; break;	//R1	G0	B-
+	}
+
+	//Luma	
+	int m = luma - ((tR*1229 + tG*2417 + tB*451) >> 12);
+	tR+=m; tG+=m; tB+=m;
+
+	#define Crowbar(x, min, max)	if (x>max) x=max; if (x<min) x=min
+
+	Crowbar(tR, 0, 4095);
+	Crowbar(tG, 0, 4095);
+	Crowbar(tB, 0, 4095);
+	
+	*R = tR; *G = tG; *B = tB;
+}
+inline void colorHexagon2(int hue, int sat, int *R, int *G, int *B){
+
+	int frac = hue >> 12;
+
+	int ci = (hue & 0xFFF) & sat;
+
+	int new_sat = sat - ci;
+	if (new_sat < 0){
+		new_sat = 0;
+	}
+	int cd = (4095 & sat) - ci;
+	int cs = 4095 & sat;
+
 	switch (frac) {
 		case 0:	*R = cs;	*G = ci;	*B = 0; break;	//R1	G+	B0
 		case 1:	*R = cd;	*G = cs;	*B = 0; break;	//R-	G1	B0
@@ -344,6 +417,37 @@ void setup_ADC( ){
 }
 
 
+void dma1_channel1_isr(void) {
+
+	DMA1_IFCR |= DMA_IFCR_CTCIF1;
+	adc_start_conversion_regular(ADC1);
+} 
+
+struct value_handler {
+	uint32_t size;
+	uint16_t *list;
+	uint16_t index;
+};
+
+uint16_t average_of_value_handler(struct value_handler *vh){
+
+	uint16_t aver = 0;
+	for(uint32_t i = 0; i < vh->size; i++){
+		aver += vh->list[i];
+	}
+	aver = aver / vh->size;
+	return aver;
+}
+
+void add_to_value_handler(struct value_handler *vh, uint16_t value){
+
+	vh->list[vh->index] = value;
+	vh->index += 1;
+	if (vh->index == vh->size){
+		vh->index = 0;
+	}
+}
+
 int main( ){
 
 	setup_clock( );
@@ -364,65 +468,97 @@ int main( ){
 	setup_ADC( );
 
 
-	int R, G, B;
+	int R, G, B = 0;
 	int hue = 0;
+	
 	int counter = 0;
 
-	int blinks = 0;
-	volatile uint32_t adc_samples2[16];
-	adc_samples2[0] = 1024;
-	adc_samples2[1] = 2;
-	adc_samples2[2] = 3;
-	adc_samples2[3] = 4;
+	
+	struct value_handler adc_values1;
+	adc_values1.size = 16;
+	uint16_t adc1_list[adc_values1.size];
+	adc_values1.list = &adc1_list;
+	adc_values1.index = 0;
+
+	for(uint32_t i = 0; i < adc_values1.size; i++){
+		adc_values1.list[i] = i;
+
+	}
+
+	uint32_t saved_adc[16];
+	uint16_t saved_i = 0;
+	for(int i = 0; i < 16; i++){
+		saved_adc[i] = 0;
+	}
+
+	uint16_t average = 0;
 	while(1) {
 
-		if (blinks == 500){
-			blinks = 0;
+
+
+		if (counter == 500){
+
+			counter = 0;
+
 			gpio_toggle(GPIOA, led_1);
+
+			//USART_putn(USART3, &adc_samples[0], 2);
+			//USART_putn(USART3, &saved_avg, 4);
+
 			//gpio_toggle(GPIOA, led_2);
 			//gpio_toggle(GPIOA, led_3);
 			//gpio_toggle(GPIOA, led_4);
 			//gpio_toggle(GPIOA, led_5);
 			//gpio_toggle(GPIOB, led_6);
+
 			/*
 			USART_putn(USART3, &adc_samples2[0], 4);
 			USART_putn(USART3, &adc_samples2[1], 4);
 			USART_putn(USART3, &adc_samples2[2], 4);+
 			*/
+
 			/*
-	        usart_send_blocking(USART3, 1);
-	        usart_send_blocking(USART3, 2);
-	        usart_send_blocking(USART3, 3);
-	        usart_send_blocking(USART3, 4);
+			USART_putn(USART3, &adc_samples[0], 2);
+			USART_putn(USART3, &adc_samples[1], 2);
+			USART_putn(USART3, &adc_samples[2], 2);
 			*/
 
-			USART_putn(USART3, &counter, 4);
-			counter += 1;
-
-		} else { blinks += 1; }
+			//add_to_value_handler(adc_values1, adc_samples[0]);
+			//average = average_of_value_handler(adc_values1);
 
 
-		//	usart_send(USART3, 63);
-		//usart_rx_buffer[0] = usart_recv(USART3);
+		} else { counter += 1; }
 
 		if (usart_recieved == true){
 
 			usart_recieved = false;
 			gpio_toggle(GPIOA, led_2);
 		}
+/*
+		if(counter % 20 == 0){
+			colorHexagon(adc_samples[0]*6, &R, &G, &B);
+			set_pwm(R & adc_samples[1], G & adc_samples[1], B & adc_samples[1]);
+		}
+*/
 		
+		if(counter % 40 == 0){
+			hue += 2;
 
-		hue = (hue + 1) % (4096*6);		
-		//colorHexagon(adc_samples[0], &R, &G, &B);
-		colorHexagon(hue, &R, &G, &B);
-		set_pwm(R, G, B);
+			add_to_value_handler(&adc_values1, adc_samples[0]);
+			average = average_of_value_handler(&adc_values1);
+/*
+			colorHexagon(average*6, &R, &G, &B);
+			set_pwm(R & adc_samples[1], G & adc_samples[1], B & adc_samples[1]);*/
 
+			//colorHSL(average*6, adc_samples[2], adc_samples[1],&R, &G, &B);
+			//colorHSL(average*6, 4095, adc_samples[2],&R, &G, &B);
+			colorHSL((hue % 4095)*6, 4095, adc_samples[2],&R, &G, &B);
 
-			//adc_start_conversion_regular(ADC1);
-
+			//colorHexagon2(average*6, adc_samples[1], &R, &G, &B);
+			set_pwm(R, G, B);
+		}
 
 		sleep_ms(1);
-
 	}
 	return 0;
 }
