@@ -10,42 +10,70 @@
 #include "gamma.h"
 #include <stdio.h>
 
-#define RMAX 4096
+/*#define RMAX 4096
 #define GMAX 4096
-#define BMAX 4096
-/*
+#define BMAX 4096*/
+
 #define RMAX 4096
 #define GMAX 3500
 #define BMAX 2500
-*/
-#define led_2 GPIO12	//
-#define led_5 GPIO15
-#define led_6 GPIO3
 
-#define led_1 GPIO11
-#define led_3 GPIO13
-#define led_4 GPIO14
+#define led_1 GPIO13
+#define led_2 GPIO14
+#define led_3 GPIO15
+#define led_4 GPIO3
 
-#define adc_pot1 GPIO0
-#define adc_pot2 GPIO4
-#define adc_pot3 GPIO5
+#define adc_pot1 GPIO4
+#define adc_pot2 GPIO5
+#define adc_pot3 GPIO6
 
-#define btn_1 GPIO1
-#define btn_2 GPIO1
-
+#define btn_1 GPIO11
+#define btn_2 GPIO12
 
 const uint16_t gamma_lut[4096] =  {GAMMA_LUT};
 volatile uint16_t adc_samples[16];
-static volatile int ms_time_delay;	//WTF!? Why do I have to use static!???
+volatile int ms_time_delay;	//WTF!? Why do I have to use static!???
 volatile uint8_t usart_rx_buffer[64];
 volatile bool usart_recieved = false;
+volatile uint32_t idle_state_LED_blinker_cnt = 0;
+
+// A struct for keeping track of an average ADC value.
+struct value_handler {
+	uint32_t size;
+	uint16_t *list;
+	uint16_t index;
+};
+
+// A struct for saving data of LED strips.
+struct led_strip{
+	int H;
+	int S;
+	int L;
+};
+
+// For deciding which LEDs to light up, and to what strip
+// the inputs are directed to.
+enum states {
+	IDLE,
+	AUTO,
+	STRIP_1,
+	STRIP_2,
+	STRIP_3
+};
+
+// States for a button, for dealing with debouncing.
+enum button_states {
+	NOT_PUSHED,
+	BOUNCE_KEEP,
+	PUSHED,
+	SUSTAINED
+};
 
 void sys_tick_handler(void){
 	if (ms_time_delay) {
 		ms_time_delay--;
 	}
 }
-
 
 void sleep_ms(int t){
 	ms_time_delay = t;
@@ -60,9 +88,10 @@ void setup_clock( ){
 	rcc_periph_clock_enable(RCC_GPIOB);
 	rcc_periph_clock_enable(RCC_AFIO);
 
-	rcc_periph_clock_enable(RCC_USART3);
+	//rcc_periph_clock_enable(RCC_USART2);
 	rcc_periph_clock_enable(RCC_ADC1);
 
+	rcc_periph_clock_enable(RCC_TIM1);
 	rcc_periph_clock_enable(RCC_TIM2);
 	rcc_periph_clock_enable(RCC_TIM3);
 	rcc_periph_clock_enable(RCC_TIM4);
@@ -72,125 +101,217 @@ void setup_clock( ){
 
 void setup_timers( ){
 
-	// Tim2 ch2, ch3, ch4
-	// Tim3 ch1, ch2, ch3, ch4
-	// Tim4 ch2, ch3
+	void setup_timer1( ){
+
+		// Clock division ratio and center aligned mode selection.
+		TIM1_CR1 = TIM_CR1_CKD_CK_INT | TIM_CR1_CMS_EDGE;
+
+		// Auto reload register.
+		TIM1_ARR = 4096-1;
+
+		// Prescaler.
+		TIM1_PSC = 0;
+
+		// Event generation register 0 update generation.
+		TIM1_EGR = TIM_EGR_UG;
+
+		TIM1_BDTR |= TIM_BDTR_MOE;
+
+		// Output compare 3 mode and preload.
+		// Capture/compare mode register, output compare 1 mode, 
+		// preload enable.
+		TIM1_CCMR1 |= TIM_CCMR1_OC2M_PWM1 | TIM_CCMR1_OC2PE;
+		TIM1_CCMR1 |= TIM_CCMR1_OC1M_PWM1 | TIM_CCMR1_OC1PE;
+		TIM1_CCMR2 |= TIM_CCMR2_OC3M_PWM1 | TIM_CCMR2_OC3PE;
+		TIM1_CCMR2 |= TIM_CCMR2_OC4M_PWM1 | TIM_CCMR2_OC4PE;
+		
+		// Polarity and state.
+		TIM1_CCER |= TIM_CCER_CC1E;
+
+		// ARR reload enable.
+		TIM1_CR1 |= TIM_CR1_ARPE;
+
+		// Counter enable.
+		TIM1_CR1 |= TIM_CR1_CEN;
+	}
+
+	void setup_timer2( ){
+
+		// Clock division ratio and center aligned mode selection.
+		TIM2_CR1 = TIM_CR1_CKD_CK_INT | TIM_CR1_CMS_EDGE;
+
+		// Auto reload register.
+		TIM2_ARR = 4096-1;
+
+		// Prescaler.
+		TIM2_PSC = 0;
+
+		// event generation register 0 update generation.
+		TIM2_EGR = TIM_EGR_UG;
+
+		// Output compare 3 mode and preload.
+		// Capture/compare mode register, output compare 1 mode, 
+		// preload enable.
+		TIM2_CCMR1 |= TIM_CCMR1_OC1M_PWM1 | TIM_CCMR1_OC1PE | TIM_CCMR1_OC2M_PWM1 | TIM_CCMR1_OC2PE;
+		TIM2_CCMR2 |= TIM_CCMR2_OC3M_PWM1 | TIM_CCMR2_OC3PE | TIM_CCMR2_OC4M_PWM1 | TIM_CCMR2_OC4PE;
+
+		// Polarity and state.
+		TIM2_CCER |= TIM_CCER_CC2E | TIM_CCER_CC3E | TIM_CCER_CC4E;
+
+		// ARR reload enable.
+		TIM2_CR1 |= TIM_CR1_ARPE;
+
+		// Counter enable.
+		TIM2_CR1 |= TIM_CR1_CEN;
+	}
+
+	void setup_timer3( ){
+
+		// Clock division ratio and center aligned mode selection.
+		TIM3_CR1 = TIM_CR1_CKD_CK_INT | TIM_CR1_CMS_EDGE;
+
+		// Period
+		TIM3_ARR = 4096-1;
+
+		// Prescaler
+		TIM3_PSC = 0;
+		TIM3_EGR = TIM_EGR_UG;
+
+		// Output compare 3 mode and preload.
+		TIM3_CCMR1 |= TIM_CCMR1_OC1M_PWM1 | TIM_CCMR1_OC1PE | TIM_CCMR1_OC2M_PWM1 | TIM_CCMR1_OC2PE;
+		TIM3_CCMR2 |= TIM_CCMR2_OC3M_PWM1 | TIM_CCMR2_OC3PE | TIM_CCMR2_OC4M_PWM1 | TIM_CCMR2_OC4PE;
+
+		// Polarity and state.
+		TIM3_CCER |= TIM_CCER_CC1E | TIM_CCER_CC2E | TIM_CCER_CC3E | TIM_CCER_CC4E;
+
+		// ARR reload enable.
+		TIM3_CR1 |= TIM_CR1_ARPE;
+
+		// Counter enable.
+		TIM3_CR1 |= TIM_CR1_CEN;		
+	}
+
+	void setup_timer4( ){
+
+		// Clock division ratio and center aligned mode selection.
+		TIM4_CR1 = TIM_CR1_CKD_CK_INT | TIM_CR1_CMS_EDGE;
+
+		// Period.
+		TIM4_ARR = 4096-1;
+
+		// Prescaler.
+		TIM4_PSC = 0;
+		TIM4_EGR = TIM_EGR_UG;
+
+		// Output compare 3 mode and preload.
+		TIM4_CCMR2 |= TIM_CCMR2_OC3M_PWM1 | TIM_CCMR2_OC3PE | TIM_CCMR2_OC4M_PWM1 | TIM_CCMR2_OC4PE;
+		TIM4_CCMR1 |= TIM_CCMR1_OC1M_PWM1 | TIM_CCMR1_OC1PE | TIM_CCMR1_OC2M_PWM1 | TIM_CCMR1_OC2PE;
+		
+		// Polarity and state.
+		TIM4_CCER |= TIM_CCER_CC1E | TIM_CCER_CC2E | TIM_CCER_CC3E | TIM_CCER_CC4E;
+
+		// ARR reload enable.
+		TIM4_CR1 |= TIM_CR1_ARPE;
+		
+		// Counter enable.
+		TIM4_CR1 |= TIM_CR1_CEN;	
+	}
+
+	/*
+		tim1_ch1 A8
+		tim3_ch4 B1
+		tim3_ch3 B0
+
+		tim3_ch2 A7
+		tim2_ch2 A1
+		tim4_ch4 B9
+
+		tim4_ch3 B8
+		tim4_ch2 B7
+		tim4_ch1 B6
+	*/
 
 	gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_10_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL,
-					GPIO1 | GPIO2 | GPIO3 | GPIO6 | GPIO7);
+					GPIO1 | GPIO7 | GPIO8);
 	gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_10_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL,
-					GPIO0 | GPIO1 | GPIO7 | GPIO8);
+					GPIO0 | GPIO1 | GPIO6 | GPIO7 | GPIO8 | GPIO9);
 
-	// Control register 1 for timer 2
-	// Clock division ratio and center aligned mode selection  
-	TIM2_CR1 = TIM_CR1_CKD_CK_INT | TIM_CR1_CMS_EDGE;
-	/* Period */
-	// Auto reload register
-	TIM2_ARR = 4096-1;
-
-	/* Prescaler */
-	TIM2_PSC = 0;
-
-	// event generation register 0 update generation
-	TIM2_EGR = TIM_EGR_UG;
-
-	/* Output compare 3 mode and preload */
-	// capture/compare mode register, output compare 1 mode, preload enable
-	//TIM2_CCMR1 |= TIM_CCMR1_OC2M_PWM1 | TIM_CCMR1_OC2PE;
-	//TIM2_CCMR2 |= TIM_CCMR2_OC3M_PWM1 | TIM_CCMR2_OC3PE;
-	TIM2_CCMR1 |= TIM_CCMR1_OC1M_PWM1 | TIM_CCMR1_OC1PE | TIM_CCMR1_OC2M_PWM1 | TIM_CCMR1_OC2PE;
-	TIM2_CCMR2 |= TIM_CCMR2_OC3M_PWM1 | TIM_CCMR2_OC3PE | TIM_CCMR2_OC4M_PWM1 | TIM_CCMR2_OC4PE;
-	/* Polarity and state */
-	TIM2_CCER |= TIM_CCER_CC2E | TIM_CCER_CC3E | TIM_CCER_CC4E;
-
-	/* ARR reload enable */
-	TIM2_CR1 |= TIM_CR1_ARPE;
-
-	/* Counter enable */
-	TIM2_CR1 |= TIM_CR1_CEN;
-
-
-	TIM3_CR1 = TIM_CR1_CKD_CK_INT | TIM_CR1_CMS_EDGE;
-	/* Period */
-	TIM3_ARR = 4096-1;
-	/* Prescaler */
-	TIM3_PSC = 0;
-	TIM3_EGR = TIM_EGR_UG;
-
-	/* Output compare 3 mode and preload */
-	//TIM3_CCMR2 |= TIM_CCMR2_OC3M_PWM1 | TIM_CCMR2_OC3PE;
-	TIM3_CCER |= TIM_CCER_CC1E | TIM_CCER_CC2E | TIM_CCER_CC3E | TIM_CCER_CC4E;
-	TIM3_CCMR1 |= TIM_CCMR1_OC1M_PWM1 | TIM_CCMR1_OC1PE | TIM_CCMR1_OC2M_PWM1 | TIM_CCMR1_OC2PE;
-	TIM3_CCMR2 |= TIM_CCMR2_OC3M_PWM1 | TIM_CCMR2_OC3PE | TIM_CCMR2_OC4M_PWM1 | TIM_CCMR2_OC4PE;
-
-	/* Polarity and state */
-	//TIM3_CCER |= TIM_CCER_CC3E;
-
-	/* ARR reload enable */
-	TIM3_CR1 |= TIM_CR1_ARPE;
-
-	/* Counter enable */
-	TIM3_CR1 |= TIM_CR1_CEN;
-
-	TIM4_CR1 = TIM_CR1_CKD_CK_INT | TIM_CR1_CMS_EDGE;
-	/* Period */
-	TIM4_ARR = 4096-1;
-	/* Prescaler */
-	TIM4_PSC = 0;
-	TIM4_EGR = TIM_EGR_UG;
-
-	/* Output compare 3 mode and preload */
-	TIM4_CCMR2 |= TIM_CCMR2_OC3M_PWM1 | TIM_CCMR2_OC3PE;
-
-	/* Polarity and state */
-	TIM4_CCER |= TIM_CCER_CC2E | TIM_CCER_CC3E;
-
-	/* ARR reload enable */
-	TIM4_CR1 |= TIM_CR1_ARPE;
-
-	/* Counter enable */
-	TIM4_CR1 |= TIM_CR1_CEN;
+	setup_timer1( );
+	setup_timer2( );
+	setup_timer3( );
+	setup_timer4( );
 }
 
+void set_pwm_strip_1(int R, int G, int B) {
 
+	int cR = gamma_lut[ (R*RMAX) >> 12 ];
+	int cG = gamma_lut[ (G*GMAX) >> 12 ];
+	int cB = gamma_lut[ (B*BMAX) >> 12 ];
 
+	
+	TIM1_CCR1 = cR;
+	TIM3_CCR4 = cG;
+	TIM3_CCR3 = cB;
+}
+
+void set_pwm_strip_2(int R, int G, int B) {
+
+	int cR = gamma_lut[ (R*RMAX) >> 12 ];
+	int cG = gamma_lut[ (G*GMAX) >> 12 ];
+	int cB = gamma_lut[ (B*BMAX) >> 12 ];
+
+	TIM3_CCR2 = cR;
+	TIM2_CCR2 = cG;
+	TIM4_CCR4 = cB;
+}
+
+void set_pwm_strip_3(int R, int G, int B) {
+
+	int cR = gamma_lut[ (R*RMAX) >> 12 ];
+	int cG = gamma_lut[ (G*GMAX) >> 12 ];
+	int cB = gamma_lut[ (B*BMAX) >> 12 ];
+
+	TIM4_CCR3 = cR;
+	TIM4_CCR2 = cG;
+	TIM4_CCR1 = cB;
+}
 
 void setup_usart(void){
 
 	// Enable the USART1 interrupt.
-	nvic_enable_irq(NVIC_USART3_IRQ);
+	nvic_enable_irq(NVIC_USART2_IRQ);
 
-	// GPIO port B.
-	gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_50_MHZ,
-		      GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO_USART3_TX);
-	gpio_set_mode(GPIOB, GPIO_MODE_INPUT,
-		      GPIO_CNF_INPUT_FLOAT, GPIO_USART3_RX);
+	// GPIO port A.
+	gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_50_MHZ,
+		      GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO_USART2_TX);
+	gpio_set_mode(GPIOA, GPIO_MODE_INPUT,
+		      GPIO_CNF_INPUT_FLOAT, GPIO_USART2_RX);
 
 	// UART parameters.
-	usart_set_baudrate(USART3, 115200);
-	usart_set_databits(USART3, 8);
-	usart_set_stopbits(USART3, USART_STOPBITS_1);
-	usart_set_mode(USART3, USART_MODE_TX_RX);
-	usart_set_parity(USART3, USART_PARITY_NONE);
-	usart_set_flow_control(USART3, USART_FLOWCONTROL_NONE);
+	usart_set_baudrate(USART2, 115200);
+	usart_set_databits(USART2, 8);
+	usart_set_stopbits(USART2, USART_STOPBITS_1);
+	usart_set_mode(USART2, USART_MODE_TX_RX);
+	usart_set_parity(USART2, USART_PARITY_NONE);
+	usart_set_flow_control(USART2, USART_FLOWCONTROL_NONE);
 
 	// Enable USART1 Receive interrupt.
-	usart_enable_rx_interrupt(USART3);
-	usart_enable_tx_interrupt(USART3);
+	usart_enable_rx_interrupt(USART2);
+	usart_enable_tx_interrupt(USART2);
 
 	// Enable the USART.
-	usart_enable(USART3);
+	usart_enable(USART2);
 }
 
-void usart3_isr(void){
+void usart2_isr(void){
 
 	/* Check if we were called because of RXNE. */
-	if (((USART_CR1(USART3) & USART_CR1_RXNEIE) != 0) &&
-	    ((USART_SR(USART3) & USART_SR_RXNE) != 0)) {
+	if (((USART_CR1(USART2) & USART_CR1_RXNEIE) != 0) &&
+	    ((USART_SR(USART2) & USART_SR_RXNE) != 0)) {
 
 
 		/* Retrieve the data from the peripheral. */
-		usart_rx_buffer[0] = usart_recv(USART3);
+		usart_rx_buffer[0] = usart_recv(USART2);
 		usart_recieved = true;
 
 		/* Enable transmit interrupt so it sends back the data. */
@@ -198,45 +319,47 @@ void usart3_isr(void){
 	}
 
 	/* Check if we were called because of TXE. */
-	if (((USART_CR1(USART3) & USART_CR1_TXEIE) != 0) &&
-	    ((USART_SR(USART3) & USART_SR_TXE) != 0)) {
+	if (((USART_CR1(USART2) & USART_CR1_TXEIE) != 0) &&
+	    ((USART_SR(USART2) & USART_SR_TXE) != 0)) {
 
 		/* Put data into the transmit register. */
-		//usart_send(USART3, &usart_rx_buffer);
-		gpio_toggle(GPIOA, led_2);
+		//usart_send(USART2, &usart_rx_buffer);
 		/* Disable the TXE interrupt, it's no longer needed. */
-		USART_CR1(USART3) &= ~USART_CR1_TXEIE;
+		USART_CR1(USART2) &= ~USART_CR1_TXEIE;
 
 	}
 
 }
-
 
 void setup_LEDs( ){
 
 	// For using PA13-15 and PB3.
 	gpio_primary_remap(AFIO_MAPR_SWJ_CFG_JTAG_OFF_SW_OFF,0);
 
-	// Output pushpulls.
+	// JTAG GPIOs remapped.
 	gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_10_MHZ,
 					GPIO_CNF_OUTPUT_PUSHPULL, led_1);
 	gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_10_MHZ,
 					GPIO_CNF_OUTPUT_PUSHPULL, led_2);
-
-	// JTAG GPIOs remapped.
-	gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_10_MHZ,
-					GPIO_CNF_OUTPUT_PUSHPULL, led_5);
-	gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_10_MHZ,
-					GPIO_CNF_OUTPUT_PUSHPULL, led_6);
 	gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_10_MHZ,
 					GPIO_CNF_OUTPUT_PUSHPULL, led_3);
-	gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_10_MHZ,
+	gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_10_MHZ,
 					GPIO_CNF_OUTPUT_PUSHPULL, led_4);
+
+	gpio_clear(GPIOA, led_1);
+	gpio_clear(GPIOA, led_2);
+	gpio_clear(GPIOA, led_3);
+	gpio_clear(GPIOB, led_4);
 }
 
-/*
-	
-*/
+void setup_buttons( ){
+
+	gpio_set_mode(GPIOA, GPIO_MODE_INPUT,
+					GPIO_CNF_INPUT_FLOAT, GPIO11);
+	gpio_set_mode(GPIOA, GPIO_MODE_INPUT,
+					GPIO_CNF_INPUT_FLOAT, GPIO12);
+}
+
 inline void colorHexagon(int hue, int *R, int *G, int *B){
 
 	int frac = hue >> 12;
@@ -252,16 +375,17 @@ inline void colorHexagon(int hue, int *R, int *G, int *B){
 		case 5:	*R = cs;	*G = 0;		*B = cd; break;	//R1	G0	B-
 	}
 }
+
 inline void colorHSL(int hue, int sat, int light,int *R, int *G, int *B) {
 
 	int tR,tG,tB;
 	int frac = hue >> 12;
 
-	//Chroma
+	// Chroma.
 	int C = ((4095-abs((light<<1)-4095))*sat)>>12;
 	int X= (C*(4095-abs((hue % 8192) - 4095)))>>12;
 
-	//Hue
+	// Hue.
 	switch (frac) {
 		case 0:	tR = C;	tG = X;	tB = 0; break;	//R1	G+	B0
 		case 1:	tR = X;	tG = C;	tB = 0; break;	//R-	G1	B0
@@ -271,7 +395,7 @@ inline void colorHSL(int hue, int sat, int light,int *R, int *G, int *B) {
 		case 5:	tR = C;	tG = 0;	tB = X; break;	//R1	G0	B-
 	}
 
-	//Lightness	
+	// Lightness.	
 	int m = light - (C>>1);
 	tR+=m; tG+=m; tB+=m;
 	*R = tR; *G = tG; *B = tB;
@@ -282,11 +406,11 @@ inline void colorHCY(int hue, int chroma, int luma,int *R, int *G, int *B) {
 	int tR,tG,tB;
 	int frac = hue >> 12;
 
-	//Chroma
+	// Chroma.
 	int C = chroma;
 	int X= (C*(4095-abs((hue % 8192) - 4095)))>>12;
 
-	//Hue
+	// Hue.
 	switch (frac) {
 		case 0:	tR = C;	tG = X;	tB = 0; break;	//R1	G+	B0
 		case 1:	tR = X;	tG = C;	tB = 0; break;	//R-	G1	B0
@@ -296,7 +420,7 @@ inline void colorHCY(int hue, int chroma, int luma,int *R, int *G, int *B) {
 		case 5:	tR = C;	tG = 0;	tB = X; break;	//R1	G0	B-
 	}
 
-	//Luma	
+	// Luma.
 	int m = luma - ((tR*1229 + tG*2417 + tB*451) >> 12);
 	tR+=m; tG+=m; tB+=m;
 
@@ -308,48 +432,6 @@ inline void colorHCY(int hue, int chroma, int luma,int *R, int *G, int *B) {
 	
 	*R = tR; *G = tG; *B = tB;
 }
-inline void colorHexagon2(int hue, int sat, int *R, int *G, int *B){
-
-	int frac = hue >> 12;
-
-	int ci = (hue & 0xFFF) & sat;
-
-	int new_sat = sat - ci;
-	if (new_sat < 0){
-		new_sat = 0;
-	}
-	int cd = (4095 & sat) - ci;
-	int cs = 4095 & sat;
-
-	switch (frac) {
-		case 0:	*R = cs;	*G = ci;	*B = 0; break;	//R1	G+	B0
-		case 1:	*R = cd;	*G = cs;	*B = 0; break;	//R-	G1	B0
-		case 2:	*R = 0;		*G = cs;	*B = ci; break;	//R0	G1	B+
-		case 3:	*R = 0;		*G = cd;	*B = cs; break;	//R0	G-	B1
-		case 4:	*R = ci;	*G = 0;		*B = cs; break;	//R+	G0	B1
-		case 5:	*R = cs;	*G = 0;		*B = cd; break;	//R1	G0	B-
-	}
-}
-
-void set_pwm(int R, int G, int B) {
-
-	int cR = gamma_lut[ (R*RMAX) >> 12 ];
-	int cG = gamma_lut[ (G*GMAX) >> 12 ];
-	int cB = gamma_lut[ (B*BMAX) >> 12 ];
-
-	TIM2_CCR2 = cR;
-	TIM2_CCR3 = cG;
-	TIM2_CCR4 = cB;
-
-	TIM3_CCR1 = cR;
-	TIM3_CCR2 = cG;
-	TIM3_CCR3 = cB;
-
-	TIM3_CCR4 = cR;
-	TIM4_CCR2 = cG;
-	TIM4_CCR3 = cB;
-}
-
 
 void USART_putn(uint32_t USARTx, volatile char *s, int size){
     
@@ -359,6 +441,7 @@ void USART_putn(uint32_t USARTx, volatile char *s, int size){
         *s++;
     }
 }
+
 void USART_puts(uint32_t USARTx, volatile char *s){
 
     while(*s){
@@ -370,7 +453,7 @@ void USART_puts(uint32_t USARTx, volatile char *s){
 void setup_ADC( ){
 
 	adc_off(ADC1);
-	gpio_set_mode(GPIOA, GPIO_MODE_INPUT, GPIO_CNF_INPUT_ANALOG, GPIO0 | GPIO4 | GPIO5);
+	gpio_set_mode(GPIOA, GPIO_MODE_INPUT, GPIO_CNF_INPUT_ANALOG, GPIO4 | GPIO5 | GPIO6);
 
 	adc_enable_scan_mode(ADC1);	
 	adc_set_single_conversion_mode(ADC1);
@@ -387,9 +470,9 @@ void setup_ADC( ){
 	adc_calibration(ADC1);
 
 	uint8_t channel_array[3];
-	channel_array[0] = ADC_CHANNEL0;
-	channel_array[1] = ADC_CHANNEL4;
-	channel_array[2] = ADC_CHANNEL5;
+	channel_array[0] = ADC_CHANNEL4;
+	channel_array[1] = ADC_CHANNEL5;
+	channel_array[2] = ADC_CHANNEL6;
 
 	adc_set_regular_sequence(ADC1, 3, channel_array);
 
@@ -416,18 +499,11 @@ void setup_ADC( ){
 	adc_enable_dma(ADC1);
 }
 
-
 void dma1_channel1_isr(void) {
 
 	DMA1_IFCR |= DMA_IFCR_CTCIF1;
 	adc_start_conversion_regular(ADC1);
 } 
-
-struct value_handler {
-	uint32_t size;
-	uint16_t *list;
-	uint16_t index;
-};
 
 uint16_t average_of_value_handler(struct value_handler *vh){
 
@@ -448,6 +524,121 @@ void add_to_value_handler(struct value_handler *vh, uint16_t value){
 	}
 }
 
+void intro_blink( ){
+
+	uint32_t counter = 0;
+	uint32_t led_state = 1;
+
+	while(led_state < 11) {
+
+		if (counter == 500){
+
+			counter = 0;
+
+			if (led_state == 1){
+				led_state = 2;
+				gpio_set(GPIOA,led_1);
+				gpio_clear(GPIOA,led_2);
+				gpio_clear(GPIOA,led_3);
+				gpio_clear(GPIOB,led_4);
+			} else {
+				if (led_state == 2){
+					led_state = 3;
+					gpio_clear(GPIOA,led_1);
+					gpio_set(GPIOA,led_2);
+					gpio_clear(GPIOA,led_3);
+					gpio_clear(GPIOB,led_4);
+
+				} else {
+					if (led_state == 3){
+						led_state = 4;
+						gpio_clear(GPIOA,led_1);
+						gpio_clear(GPIOA,led_2);
+						gpio_set(GPIOA,led_3);
+						gpio_clear(GPIOB,led_4);
+					} else {							
+						if (led_state == 4){
+							led_state = 5;
+							gpio_clear(GPIOA,led_1);
+							gpio_clear(GPIOA,led_2);
+							gpio_clear(GPIOA,led_3);
+							gpio_set(GPIOB,led_4);
+						} else {
+							if (led_state == 5){
+								led_state = 6;
+								gpio_set(GPIOA,led_1);
+								gpio_set(GPIOA,led_2);
+								gpio_set(GPIOA,led_3);
+								gpio_set(GPIOB,led_4);
+							} else {
+								if (led_state >= 5){
+									led_state += 1;
+									gpio_toggle(GPIOA,led_1);
+									gpio_toggle(GPIOA,led_2);
+									gpio_toggle(GPIOA,led_3);
+									gpio_toggle(GPIOB,led_4);
+								}	
+							}
+						}
+					}
+				}
+			}
+		} else { 
+			counter += 1;
+		}
+		sleep_ms(1);
+	}
+
+	gpio_clear(GPIOA,led_1);
+	gpio_clear(GPIOA,led_2);
+	gpio_clear(GPIOA,led_3);
+	gpio_clear(GPIOB,led_4);
+}
+
+void idle_state_LED_blinker( ){
+
+	idle_state_LED_blinker_cnt++;
+
+	if (idle_state_LED_blinker_cnt == 4){
+		idle_state_LED_blinker_cnt = 0;
+	}
+
+	switch (idle_state_LED_blinker_cnt){
+
+		case 0:
+			gpio_set(GPIOA,led_1);
+			gpio_clear(GPIOA,led_2);
+			gpio_clear(GPIOA,led_3);
+			gpio_clear(GPIOB,led_4);
+
+			break;
+			
+		case 1:
+			gpio_clear(GPIOA,led_1);
+			gpio_set(GPIOA,led_2);
+			gpio_clear(GPIOA,led_3);
+			gpio_clear(GPIOB,led_4);
+
+			break;
+			
+		case 2:
+			gpio_clear(GPIOA,led_1);
+			gpio_clear(GPIOA,led_2);
+			gpio_set(GPIOA,led_3);
+			gpio_clear(GPIOB,led_4);
+
+			break;
+			
+		case 3:
+			gpio_clear(GPIOA,led_1);
+			gpio_clear(GPIOA,led_2);
+			gpio_clear(GPIOA,led_3);
+			gpio_set(GPIOB,led_4);
+
+			break;
+	}
+}
+
 int main( ){
 
 	setup_clock( );
@@ -458,109 +649,216 @@ int main( ){
 	systick_counter_enable( );
 
 	setup_LEDs( );
-
-	gpio_clear(GPIOA, led_2 | led_1);
-	gpio_clear(GPIOA, led_3 | led_4 | led_5);
-	gpio_clear(GPIOB, led_6);
+	setup_buttons( );
 
 	setup_timers( );
-	setup_usart( );
+	//setup_usart( );
 	setup_ADC( );
 
-
-	int R, G, B = 0;
-	int hue = 0;
-	
-	int counter = 0;
-
-	
+	// ADC average.
 	struct value_handler adc_values1;
 	adc_values1.size = 16;
 	uint16_t adc1_list[adc_values1.size];
 	adc_values1.list = &adc1_list;
 	adc_values1.index = 0;
-
-	for(uint32_t i = 0; i < adc_values1.size; i++){
-		adc_values1.list[i] = i;
-
-	}
-
-	uint32_t saved_adc[16];
-	uint16_t saved_i = 0;
-	for(int i = 0; i < 16; i++){
-		saved_adc[i] = 0;
-	}
-
 	uint16_t average = 0;
-	while(1) {
+
+	// Declaring variables for the auto roll mode.
+	uint32_t program_counter = 0;
+	uint32_t auto_roll_speed = 40;
+	uint32_t auto_roll_is_paused = 0;
+	uint32_t auto_roll_hue_strip_1 = 1333;
+	uint32_t auto_roll_hue_strip_2 = 2666;
+	uint32_t auto_roll_hue_strip_3 = 3999;
+
+	// Declaring the state variables.
+	enum states current_state = IDLE;
+	enum button_states button_1_state = NOT_PUSHED;
+	enum button_states button_2_state = NOT_PUSHED;
 
 
+	// Declaring the LED strip structs.
+	struct led_strip led_strip_1 = {1333,4095,2000};
+	struct led_strip led_strip_2 = {2666,4095,2000};
+	struct led_strip led_strip_3 = {3999,4095,2000};
 
-		if (counter == 500){
+	// Variables for PWM data, derived from hue variable.
+	int R, G, B = 0;
 
-			counter = 0;
+	// Startup blinking function, for added coolness.
+	//intro_blink( );
 
-			gpio_toggle(GPIOA, led_1);
-
-			//USART_putn(USART3, &adc_samples[0], 2);
-			//USART_putn(USART3, &saved_avg, 4);
-
-			//gpio_toggle(GPIOA, led_2);
-			//gpio_toggle(GPIOA, led_3);
-			//gpio_toggle(GPIOA, led_4);
-			//gpio_toggle(GPIOA, led_5);
-			//gpio_toggle(GPIOB, led_6);
-
-			/*
-			USART_putn(USART3, &adc_samples2[0], 4);
-			USART_putn(USART3, &adc_samples2[1], 4);
-			USART_putn(USART3, &adc_samples2[2], 4);+
-			*/
-
-			/*
-			USART_putn(USART3, &adc_samples[0], 2);
-			USART_putn(USART3, &adc_samples[1], 2);
-			USART_putn(USART3, &adc_samples[2], 2);
-			*/
-
-			//add_to_value_handler(adc_values1, adc_samples[0]);
-			//average = average_of_value_handler(adc_values1);
-
-
-		} else { counter += 1; }
-
-		if (usart_recieved == true){
-
-			usart_recieved = false;
-			gpio_toggle(GPIOA, led_2);
-		}
-/*
-		if(counter % 20 == 0){
-			colorHexagon(adc_samples[0]*6, &R, &G, &B);
-			set_pwm(R & adc_samples[1], G & adc_samples[1], B & adc_samples[1]);
-		}
-*/
-		
-		if(counter % 40 == 0){
-			hue += 2;
-
-			add_to_value_handler(&adc_values1, adc_samples[0]);
-			average = average_of_value_handler(&adc_values1);
-/*
-			colorHexagon(average*6, &R, &G, &B);
-			set_pwm(R & adc_samples[1], G & adc_samples[1], B & adc_samples[1]);*/
-
-			//colorHSL(average*6, adc_samples[2], adc_samples[1],&R, &G, &B);
-			//colorHSL(average*6, 4095, adc_samples[2],&R, &G, &B);
-			colorHSL((hue % 4095)*6, 4095, adc_samples[2],&R, &G, &B);
-
-			//colorHexagon2(average*6, adc_samples[1], &R, &G, &B);
-			set_pwm(R, G, B);
-		}
-
+	while(1)
+	{
 		sleep_ms(1);
+		program_counter++;
+
+		// UART data.
+		if (usart_recieved == true){
+			usart_recieved = false;
+		}
+
+/*			add_to_value_handler(&adc_values1, adc_samples[2]);
+			average = average_of_value_handler(&adc_values1);
+*/
+
+		// Checking the buttons and changing state.
+		if(program_counter % 40 == 0)
+		{
+			// Checking button 1.
+			if (gpio_get(GPIOA, btn_1) != 0) {
+				if (button_1_state == NOT_PUSHED){
+					button_1_state = PUSHED;
+				} else {
+					if (button_1_state == PUSHED){
+						button_1_state = SUSTAINED;
+					}
+				}
+			} else {
+				button_1_state = NOT_PUSHED;
+			}
+	
+			// Checking button 2.
+			if (gpio_get(GPIOA, btn_2) != 0) {
+				if (button_2_state == NOT_PUSHED){
+					button_2_state = PUSHED;
+				} else {
+					if (button_2_state == PUSHED){
+						button_2_state = SUSTAINED;
+					}
+				}
+			} else {
+				button_2_state = NOT_PUSHED;
+			}
+
+			// Changing state.
+			if (button_1_state == PUSHED){
+				if (current_state == STRIP_3){
+					current_state = IDLE;
+				} else {
+					current_state++;
+				}
+			}
+
+			// Pausing autoroll.
+			if (button_2_state == PUSHED){
+				if (current_state == AUTO){
+					if (auto_roll_is_paused == 0){
+						auto_roll_is_paused = 1;
+					} else {
+						auto_roll_is_paused = 0;
+					}
+				}
+			}
+		}
+
+		// State depending actions, i.e., setting the PWMs, and saving the
+		// inputs. If in a state of any strip, it will display the current
+		// inputs of the ADC, otherwise it will use its saved data.
+		// The four LEDs will indicate which state is the current.
+		switch (current_state){
+			case IDLE:	
+
+				if (program_counter % 500 == 0){
+					idle_state_LED_blinker( );
+				}
+
+				colorHSL(led_strip_1.H*6, led_strip_1.S, led_strip_1.L, &R, &G, &B);
+				set_pwm_strip_1(R, G, B);
+				colorHSL(led_strip_2.H*6, led_strip_2.S, led_strip_2.L, &R, &G, &B);
+				set_pwm_strip_2(R, G, B);
+				colorHSL(led_strip_3.H*6, led_strip_3.S, led_strip_3.L, &R, &G, &B);
+				set_pwm_strip_3(R, G, B);
+
+				break;
+
+			case AUTO:
+
+				gpio_set(GPIOA,led_1);
+				gpio_clear(GPIOA,led_2);
+				gpio_clear(GPIOA,led_3);
+				gpio_clear(GPIOB,led_4);
+
+				if (auto_roll_is_paused == 0){
+					auto_roll_speed = adc_samples[2]/400+1;
+					if(program_counter % auto_roll_speed == 0){
+						
+						auto_roll_hue_strip_1++;
+						auto_roll_hue_strip_2++;
+						auto_roll_hue_strip_3++;					
+						colorHSL((auto_roll_hue_strip_1%4095)*6, 4095, adc_samples[0], &R, &G, &B);
+						set_pwm_strip_1(R, G, B);
+						colorHSL((auto_roll_hue_strip_2%4095)*6, 4095, adc_samples[0], &R, &G, &B);
+						set_pwm_strip_2(R, G, B);
+						colorHSL((auto_roll_hue_strip_3%4095)*6, 4095, adc_samples[0], &R, &G, &B);
+						set_pwm_strip_3(R, G, B);
+					}
+				}
+
+				break;
+
+			case STRIP_1:
+
+				gpio_clear(GPIOA,led_1);
+				gpio_set(GPIOA,led_2);
+
+				if (button_2_state == PUSHED){
+					auto_roll_hue_strip_1 = adc_samples[2];
+					led_strip_1.H = adc_samples[2];
+					led_strip_1.S = adc_samples[1];
+					led_strip_1.L = adc_samples[0];
+				}
+				colorHSL(adc_samples[2]*6, adc_samples[1], adc_samples[0], &R, &G, &B);
+				set_pwm_strip_1(R, G, B);
+				colorHSL(led_strip_2.H*6, led_strip_2.S, led_strip_2.L, &R, &G, &B);
+				set_pwm_strip_2(R, G, B);
+				colorHSL(led_strip_3.H*6, led_strip_3.S, led_strip_3.L, &R, &G, &B);
+				set_pwm_strip_3(R, G, B);
+
+				break;
+
+			case STRIP_2:
+
+				gpio_clear(GPIOA,led_2);
+				gpio_set(GPIOA,led_3);
+
+				if (button_2_state == PUSHED){
+					auto_roll_hue_strip_2 = adc_samples[2];
+					led_strip_2.H = adc_samples[2];
+					led_strip_2.S = adc_samples[1];
+					led_strip_2.L = adc_samples[0];
+				}
+
+				colorHSL(led_strip_1.H*6, led_strip_1.S, led_strip_1.L, &R, &G, &B);
+				set_pwm_strip_1(R, G, B);
+				colorHSL(adc_samples[2]*6, adc_samples[1], adc_samples[0], &R, &G, &B);
+				set_pwm_strip_2(R, G, B);
+				colorHSL(led_strip_3.H*6, led_strip_3.S, led_strip_3.L, &R, &G, &B);
+				set_pwm_strip_3(R, G, B);
+
+				break;
+
+			case STRIP_3:
+
+				gpio_clear(GPIOA,led_3);
+				gpio_set(GPIOB,led_4);
+
+				if (button_2_state == PUSHED){
+					auto_roll_hue_strip_3 = adc_samples[2];
+					led_strip_3.H = adc_samples[2];
+					led_strip_3.S = adc_samples[1];
+					led_strip_3.L = adc_samples[0];
+				}
+
+				colorHSL(led_strip_1.H*6, led_strip_1.S, led_strip_1.L, &R, &G, &B);
+				set_pwm_strip_1(R, G, B);
+				colorHSL(led_strip_2.H*6, led_strip_2.S, led_strip_2.L, &R, &G, &B);
+				set_pwm_strip_2(R, G, B);
+				colorHSL(adc_samples[2]*6, adc_samples[1], adc_samples[0], &R, &G, &B);
+				set_pwm_strip_3(R, G, B);
+
+				break;
+		}
 	}
 	return 0;
 }
-
-
