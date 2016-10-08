@@ -785,15 +785,15 @@ int main( ){
 						
 						auto_roll_hue_strip_1++;
 						auto_roll_hue_strip_2++;
-						auto_roll_hue_strip_3++;					
-						colorHSL((auto_roll_hue_strip_1%4095)*6, 4095, adc_samples[0], &R, &G, &B);
-						set_pwm_strip_1(R, G, B);
-						colorHSL((auto_roll_hue_strip_2%4095)*6, 4095, adc_samples[0], &R, &G, &B);
-						set_pwm_strip_2(R, G, B);
-						colorHSL((auto_roll_hue_strip_3%4095)*6, 4095, adc_samples[0], &R, &G, &B);
-						set_pwm_strip_3(R, G, B);
+						auto_roll_hue_strip_3++;
 					}
 				}
+				colorHSL((auto_roll_hue_strip_1%4095)*6, 4095, adc_samples[0], &R, &G, &B);
+				set_pwm_strip_1(R, G, B);
+				colorHSL((auto_roll_hue_strip_2%4095)*6, 4095, adc_samples[0], &R, &G, &B);
+				set_pwm_strip_2(R, G, B);
+				colorHSL((auto_roll_hue_strip_3%4095)*6, 4095, adc_samples[0], &R, &G, &B);
+				set_pwm_strip_3(R, G, B);
 
 				break;
 
