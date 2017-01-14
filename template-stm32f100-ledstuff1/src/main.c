@@ -30,6 +30,13 @@
 #define btn_1 GPIO11
 #define btn_2 GPIO12
 
+// WS2812
+#define NUMBER_LEDS 16
+#define BIT_0 10
+#define BIT_1 29
+#define FREQ 400000
+
+
 const uint16_t gamma_lut[4096] =  {GAMMA_LUT};
 volatile uint16_t adc_samples[16];
 volatile int ms_time_delay;	//WTF!? Why do I have to use static!???
@@ -68,6 +75,17 @@ enum button_states {
 	PUSHED,
 	SUSTAINED
 };
+
+// WS2812
+struct color {
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
+};
+volatile uint8_t led_output_buf[NUMBER_LEDS*24+1];	//42 x 24
+volatile struct color led_input_buf[NUMBER_LEDS];
+
+
 
 void sys_tick_handler(void){
 	if (ms_time_delay) {
@@ -242,6 +260,37 @@ void setup_timers( ){
 	setup_timer4( );
 }
 
+
+void setup_timer_for_ws2812( ){
+
+	//LED data out
+	gpio_set(GPIOB, GPIO0);
+	gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, GPIO0);
+
+
+	TIM3_CR1 = TIM_CR1_CKD_CK_INT | TIM_CR1_CMS_EDGE;
+	/* Period */
+	TIM3_ARR = (24000000 / FREQ)-1;
+	/* Prescaler */
+	TIM3_PSC = 0;
+	TIM3_EGR = TIM_EGR_UG;
+
+	/* Output compare 3 mode and preload */
+	TIM3_CCMR2 |= TIM_CCMR2_OC3M_PWM2 | TIM_CCMR2_OC3PE;
+
+	/* Polarity and state */
+	TIM3_CCER |= TIM_CCER_CC3E;
+
+	/* ARR reload enable */
+	TIM3_CR1 |= TIM_CR1_ARPE;
+
+	/* Counter enable */
+	TIM3_CR1 |= TIM_CR1_CEN;
+
+
+	TIM3_CCR3 = 0;
+}
+
 void set_pwm_strip_1(int R, int G, int B) {
 
 	int cR = gamma_lut[ (R*RMAX) >> 12 ];
@@ -276,7 +325,22 @@ void set_pwm_strip_3(int R, int G, int B) {
 	TIM4_CCR1 = cB;
 }
 
-void setup_usart(void){
+void setup_usart_1( ) {
+
+	gpio_set_mode(GPIOA, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT, GPIO_USART1_RX);
+
+
+	usart_set_baudrate(USART1, 921600);
+	usart_set_databits(USART1, 8);
+	usart_set_stopbits(USART1, USART_STOPBITS_1);
+	usart_set_mode(USART1, USART_MODE_RX);
+	usart_set_parity(USART1, USART_PARITY_NONE);
+	usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
+
+	usart_enable(USART1);
+}
+
+void setup_usart_2(void){
 
 	// Enable the USART1 interrupt.
 	nvic_enable_irq(NVIC_USART2_IRQ);
@@ -639,6 +703,94 @@ void idle_state_LED_blinker( ){
 	}
 }
 
+// WS2812
+void dma1_transmit_8_32(uint32_t src, uint32_t dst, uint32_t length, uint32_t channel) {
+
+	dma_disable_channel(DMA1, channel);
+
+	dma_channel_reset(DMA1, channel);
+
+	dma_set_peripheral_address(DMA1, channel, dst);
+	dma_set_memory_address(DMA1, channel, src);
+	dma_set_number_of_data(DMA1, channel, length);
+	dma_set_read_from_memory(DMA1, channel);
+	dma_enable_memory_increment_mode(DMA1, channel);
+	dma_set_peripheral_size(DMA1, channel, DMA_CCR_PSIZE_32BIT);
+	dma_set_memory_size(DMA1, channel, DMA_CCR_MSIZE_8BIT);
+	dma_set_priority(DMA1, channel, DMA_CCR_PL_VERY_HIGH);
+
+	dma_enable_channel(DMA1, channel);
+
+}
+
+void dma1_recieve(uint32_t src, uint32_t dst, uint32_t length, uint32_t channel) {
+	
+	dma_disable_channel(DMA1, channel);
+	dma_channel_reset(DMA1, channel);
+
+	dma_set_peripheral_address(DMA1, channel, src);
+	dma_set_memory_address(DMA1, channel, dst);
+	dma_set_number_of_data(DMA1, channel, length);
+	dma_set_read_from_peripheral(DMA1, channel);
+	dma_enable_memory_increment_mode(DMA1, channel);
+	dma_set_peripheral_size(DMA1, channel, DMA_CCR_PSIZE_8BIT);
+	dma_set_memory_size(DMA1, channel, DMA_CCR_MSIZE_8BIT);
+	dma_set_priority(DMA1, channel, DMA_CCR_PL_VERY_HIGH);
+
+	dma_enable_channel(DMA1, channel);
+
+}
+
+void populate_test_buffer() {
+	// start populate buffer
+	for (int led=0;led<NUMBER_LEDS;led++) {
+		led_input_buf[led].r = 192;
+		led_input_buf[led].g = 0;
+		led_input_buf[led].b = 0;
+	}
+}
+
+void process_buffer() {
+	volatile uint8_t* ptr=led_output_buf;
+	for (int led=0;led<NUMBER_LEDS;led++) {
+
+		for (int bit=7;bit>=0;bit--) { *ptr++ = led_input_buf[led].g & (1 << bit) ? BIT_1 : BIT_0; }
+		for (int bit=7;bit>=0;bit--) { *ptr++ = led_input_buf[led].r & (1 << bit) ? BIT_1 : BIT_0; }
+		for (int bit=7;bit>=0;bit--) { *ptr++ = led_input_buf[led].b & (1 << bit) ? BIT_1 : BIT_0; }
+	}
+}
+
+void send_led_buffer( ) {
+	// Send led data
+	// dma_enable_transfer_complete_interrupt(DMA1, DMA_CHANNEL5);
+
+	dma1_transmit_8_32((uint32_t) led_output_buf, (uint32_t) &TIM3_CCR3, 24*NUMBER_LEDS+1, DMA_CHANNEL2 );
+	TIM3_DIER |= TIM_DIER_CC3DE;	//Enable DMA transfer for CC1
+}
+
+void send_led_buffer_blocking( ) {
+	//dma_clear_interrupt_flag(DMA1, DMA_CHANNEL2, DMA_TCIF);
+	send_led_buffer();
+	while (!dma_get_interrupt_flag(DMA1, DMA_CHANNEL2, DMA_TCIF));
+
+	TIM3_DIER &= ~TIM_DIER_CC3DE;	//Disable DMA transfer for CC1
+}
+
+void recieve_led_data_blocking( ) {
+
+
+	//dma_clear_interrupt_flag(DMA1, DMA_CHANNEL5, DMA_TCIF);
+	dma1_recieve((uint32_t)&USART1_DR, (uint32_t)led_input_buf, NUMBER_LEDS * sizeof(struct color), DMA_CHANNEL5);
+
+	usart_enable_rx_dma(USART1);
+
+
+	while (!dma_get_interrupt_flag(DMA1, DMA_CHANNEL5, DMA_TCIF));
+
+	usart_disable_rx_dma(USART1);
+
+
+}
 int main( ){
 
 	setup_clock( );
@@ -648,12 +800,39 @@ int main( ){
 	systick_interrupt_enable( );
 	systick_counter_enable( );
 
+
 	setup_LEDs( );
 	setup_buttons( );
 
 	setup_timers( );
-	//setup_usart( );
+	//setup_usart_2( );
 	setup_ADC( );
+	setup_usart_1( );
+
+
+/*
+//WS2812
+
+	setup_LEDs( );
+	setup_timer_for_ws2812( );
+
+	
+	populate_test_buffer();
+	process_buffer();
+	send_led_buffer_blocking( );
+
+	while(1) {
+		//recieve_led_data_blocking();
+		sleep_ms(10);
+		program_counter++;
+		if(program_counter % 40 == 0){
+			idle_state_LED_blinker( );
+		}
+		process_buffer( );
+		send_led_buffer_blocking( );
+	}
+*/
+uint32_t program_counter = 0;
 
 	// ADC average.
 	struct value_handler adc_values1;
@@ -664,7 +843,7 @@ int main( ){
 	uint16_t average = 0;
 
 	// Declaring variables for the auto roll mode.
-	uint32_t program_counter = 0;
+	//uint32_t program_counter = 0;
 	uint32_t auto_roll_speed = 40;
 	uint32_t auto_roll_is_paused = 0;
 	uint32_t auto_roll_hue_strip_1 = 1333;
@@ -672,7 +851,7 @@ int main( ){
 	uint32_t auto_roll_hue_strip_3 = 3999;
 
 	// Declaring the state variables.
-	enum states current_state = IDLE;
+	enum states current_state = AUTO;
 	enum button_states button_1_state = NOT_PUSHED;
 	enum button_states button_2_state = NOT_PUSHED;
 
@@ -684,6 +863,8 @@ int main( ){
 
 	// Variables for PWM data, derived from hue variable.
 	int R, G, B = 0;
+
+
 
 	// Startup blinking function, for added coolness.
 	//intro_blink( );
