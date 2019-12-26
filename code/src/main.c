@@ -440,7 +440,7 @@ inline void colorHexagon(int hue, int *R, int *G, int *B){
 	}
 }
 
-inline void colorHSL(int hue, int sat, int light,int *R, int *G, int *B) {
+colorHSL(int hue, int sat, int light,int *R, int *G, int *B) {
 
 	int tR,tG,tB;
 	int frac = hue >> 12;
