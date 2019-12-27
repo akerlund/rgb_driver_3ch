@@ -1,6 +1,6 @@
 # LED driver PCB, 3ch RGB
 
-![Version Three](https://github.com/akerlund/rgb_driver_3ch/blob/master/kicad/version_3.png)
+![Version Three](https://github.com/akerlund/rgb_driver_3ch/blob/master/soldered_an_ready.jpg)
 
 STM32F100 microcontroller with small SOT23 MOSFETs to drive 12V LED strips.
 Four LEDs and two buttons for custom use.
