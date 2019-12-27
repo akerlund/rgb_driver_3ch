@@ -9,6 +9,13 @@ A CP2102 serial to USB interface.
 Pinout for other peripherals, i.e., I2C, SPI and UART.
 
 ## Build
+
+Using the ARM compiler (arm-none-eabi), which can be installed with
+
+```
+sudo apt-get install gcc-arm-none-eabi
+```
+then change directory and run the make file
 ```
 cd code
 make
